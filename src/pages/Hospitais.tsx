@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Building2, MapPin, Phone, Edit, Trash2 } from "lucide-react";
+import { Plus, Building2, MapPin, Phone, Edit, Trash2, Filter, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -21,6 +21,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
   hospitaisApi,
@@ -437,7 +438,7 @@ export default function Hospitais() {
         formData.baselineNome ||
         formData.baselineQuantidadeFuncionarios ||
         baselineSites.length > 0;
-      if (baselineProvided)
+      if (baselineProvided) {
         payload.baseline = {
           nome: `baseline_${formData.nome}`,
           quantidade_funcionarios: formData.baselineQuantidadeFuncionarios
@@ -450,6 +451,7 @@ export default function Hospitais() {
             .map((s) => String(parseBRLToNumber(String(s.custo)).toFixed(2)))
             .filter(Boolean),
         } as any;
+      }
 
       if (editingHospital) {
         await hospitaisApi.atualizar(editingHospital.id, payload);
@@ -489,7 +491,9 @@ export default function Hospitais() {
         custo: formatToBRL(hospital.baseline?.custo?.[i] || ""),
       }));
       setBaselineSites(setores);
-    } else setBaselineSites([]);
+    } else {
+      setBaselineSites([]);
+    }
     // set modal-level selects from hospital (assume nested objects present)
     const regiaoObj = hospital.regiao;
     const grupoObj = regiaoObj?.grupo;
@@ -518,11 +522,12 @@ export default function Hospitais() {
   };
 
   const criarRedeLocal = async () => {
-    if (!newRedeName.trim())
+    if (!newRedeName.trim()) {
       return toast({
         title: "Nome da rede obrigatório",
         variant: "destructive",
       });
+    }
     try {
       const r: any = await redesApi.criar({ nome: newRedeName });
       const id = r?.id || r?.data?.id;
@@ -541,17 +546,19 @@ export default function Hospitais() {
   };
 
   const criarGrupoLocal = async () => {
-    if (!newGrupoName.trim())
+    if (!newGrupoName.trim()) {
       return toast({
         title: "Nome do grupo obrigatório",
         variant: "destructive",
       });
+    }
     const redeIdToUse = selectedRedeForGrupo || createdRedeId;
-    if (!redeIdToUse)
+    if (!redeIdToUse) {
       return toast({
         title: "Selecione uma rede para criar o grupo",
         variant: "destructive",
       });
+    }
     try {
       const g: any = await gruposApi.criar({
         nome: newGrupoName,
@@ -573,17 +580,19 @@ export default function Hospitais() {
   };
 
   const criarRegiaoLocal = async () => {
-    if (!newRegiaoName.trim())
+    if (!newRegiaoName.trim()) {
       return toast({
         title: "Nome da região obrigatório",
         variant: "destructive",
       });
+    }
     const grupoIdToUse = selectedGrupoForRegiao || createdGrupoId;
-    if (!grupoIdToUse)
+    if (!grupoIdToUse) {
       return toast({
         title: "Selecione um grupo para criar a região",
         variant: "destructive",
       });
+    }
     try {
       const rg: any = await regioesApi.criar({
         nome: newRegiaoName,
@@ -604,7 +613,7 @@ export default function Hospitais() {
     }
   };
 
-  if (loading)
+  if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-64">
@@ -612,6 +621,7 @@ export default function Hospitais() {
         </div>
       </DashboardLayout>
     );
+  }
 
   const hospitaisFiltrados = getHospitaisFiltrados();
 
@@ -1371,9 +1381,8 @@ export default function Hospitais() {
                     Filtros ativos:
                   </span>
                   <Button
-                    variant="ghost"
-                    size="sm"
                     variant="outline"
+                    size="sm"
                     onClick={() => {
                       setSelectedRede("all");
                       setSelectedGrupo("all");
@@ -1388,15 +1397,6 @@ export default function Hospitais() {
             </CardContent>
           </Card>
         )}
-      </div>
-    </DashboardLayout>
-  );
-}
-
-              </CardContent>
-            </Card>
-          )}
-        </div>
       </div>
     </DashboardLayout>
   );
