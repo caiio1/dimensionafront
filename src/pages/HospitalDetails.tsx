@@ -37,6 +37,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { StatsCard } from "@/components/StatsCard";
+import { HospitalNavigationCard } from "@/components/HospitalNavigationCard";
+import { HierarchyBreadcrumb } from "@/components/HierarchyBreadcrumb";
 import {
   hospitaisApi,
   unidadesApi,
@@ -270,35 +272,48 @@ export default function HospitalDetails() {
       <div className="space-y-6">
         {/* Header com navegação breadcrumb */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+          <div className="space-y-3">
             <Button
               variant="ghost"
               onClick={() => navigate("/hospitais")}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-2 mb-2"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Hospitais</span>
             </Button>
-            <Separator orientation="vertical" className="h-6" />
-            <div>
-              <h1 className="text-2xl font-bold flex items-center space-x-2">
-                <Building2 className="h-6 w-6 text-primary" />
-                <span>{hospital.nome}</span>
-              </h1>
-              <div className="flex items-center space-x-2 mt-1">
-                {hospital.regiao && (
-                  <div className="text-sm text-muted-foreground">
-                    {hospital.regiao.grupo?.rede?.nome && (
-                      <span>{hospital.regiao.grupo.rede.nome} → </span>
-                    )}
-                    {hospital.regiao.grupo?.nome && (
-                      <span>{hospital.regiao.grupo.nome} → </span>
-                    )}
-                    <span>{hospital.regiao.nome}</span>
-                  </div>
-                )}
-              </div>
-            </div>
+            
+            <h1 className="text-3xl font-bold flex items-center space-x-3">
+              <Building2 className="h-8 w-8 text-primary" />
+              <span>{hospital.nome}</span>
+            </h1>
+            
+            {/* Hierarquia organizacional */}
+            {hospital.regiao && (
+              <HierarchyBreadcrumb
+                levels={[
+                  ...(hospital.regiao.grupo?.rede ? [{
+                    id: hospital.regiao.grupo.rede.id,
+                    nome: hospital.regiao.grupo.rede.nome,
+                    type: "rede" as const,
+                  }] : []),
+                  ...(hospital.regiao.grupo ? [{
+                    id: hospital.regiao.grupo.id,
+                    nome: hospital.regiao.grupo.nome,
+                    type: "grupo" as const,
+                  }] : []),
+                  {
+                    id: hospital.regiao.id,
+                    nome: hospital.regiao.nome,
+                    type: "regiao" as const,
+                  },
+                  {
+                    id: hospital.id,
+                    nome: hospital.nome,
+                    type: "hospital" as const,
+                  },
+                ]}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
@@ -459,6 +474,194 @@ export default function HospitalDetails() {
             description={`${stats.totalColaboradores} total`}
           />
         </div>
+
+        {/* Navegação principal por módulos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <HospitalNavigationCard
+            title="Unidades de Internação"
+            description="Gerencie UTIs, enfermarias e unidades com leitos para internação de pacientes"
+            icon={Bed}
+            count={stats.unidadesInternacao}
+            countLabel="unidades"
+            primaryAction={{
+              label: "Gerenciar Unidades",
+              onClick: () => navigate(`/unidades?hospitalId=${id}`),
+            }}
+            secondaryAction={{
+              label: "Nova",
+              onClick: () => navigate(`/unidades/criar?hospitalId=${id}`),
+            }}
+          >
+            {unidades.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Últimas unidades:
+                </p>
+                <div className="space-y-1">
+                  {unidades.slice(0, 3).map((unidade) => (
+                    <div
+                      key={unidade.id}
+                      className="flex items-center justify-between text-xs p-2 bg-muted/30 rounded"
+                    >
+                      <span className="font-medium">{unidade.nome}</span>
+                      <span className="text-muted-foreground">
+                        {unidade.numeroLeitos} leitos
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </HospitalNavigationCard>
+
+          <HospitalNavigationCard
+            title="Unidades Especiais"
+            description="Centro cirúrgico, ambulatórios, SADT e outras unidades de não-internação"
+            icon={Activity}
+            count={stats.unidadesNaoInternacao}
+            countLabel="unidades"
+            primaryAction={{
+              label: "Gerenciar Unidades",
+              onClick: () => navigate(`/hospitais/${id}/unidades-nao-internacao`),
+              variant: "secondary",
+            }}
+            secondaryAction={{
+              label: "Nova",
+              onClick: () => navigate(`/hospitais/${id}/unidades-nao-internacao/criar`),
+            }}
+          >
+            {unidadesNaoInt.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Tipos cadastrados:
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {Array.from(new Set(unidadesNaoInt.map(u => u.tipo))).map((tipo) => (
+                    <Badge key={tipo} variant="outline" className="text-xs">
+                      {tipo.replace(/_/g, " ")}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </HospitalNavigationCard>
+
+          <HospitalNavigationCard
+            title="Equipe e Colaboradores"
+            description="Gerencie funcionários, cargos e escalas de trabalho do hospital"
+            icon={Users}
+            count={stats.colaboradoresAtivos}
+            countLabel="ativos"
+            primaryAction={{
+              label: "Gerenciar Equipe",
+              onClick: () => navigate(`/colaboradores?hospitalId=${id}`),
+            }}
+            secondaryAction={{
+              label: "Novo",
+              onClick: () => navigate(`/colaboradores/criar?hospitalId=${id}`),
+            }}
+          >
+            {colaboradores.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Distribuição por cargo:
+                </p>
+                <div className="space-y-1">
+                  {Object.entries(
+                    colaboradores.reduce((acc, c) => {
+                      acc[c.cargo] = (acc[c.cargo] || 0) + 1;
+                      return acc;
+                    }, {} as Record<string, number>)
+                  ).slice(0, 3).map(([cargo, count]) => (
+                    <div key={cargo} className="flex items-center justify-between text-xs">
+                      <span className="font-medium">{cargo}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {count}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </HospitalNavigationCard>
+
+          <HospitalNavigationCard
+            title="Relatórios e Análises"
+            description="Acesse relatórios operacionais, estatísticas e análises de performance"
+            icon={BarChart3}
+            primaryAction={{
+              label: "Ver Relatórios",
+              onClick: () => navigate(`/relatorios/mensal?hospitalId=${id}`),
+              variant: "outline",
+            }}
+          >
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="p-2 bg-primary/5 rounded">
+                  <p className="text-lg font-bold text-primary">{stats.totalLeitos}</p>
+                  <p className="text-xs text-muted-foreground">Leitos</p>
+                </div>
+                <div className="p-2 bg-secondary/5 rounded">
+                  <p className="text-lg font-bold text-secondary">{stats.totalSitios}</p>
+                  <p className="text-xs text-muted-foreground">Sítios</p>
+                </div>
+              </div>
+            </div>
+          </HospitalNavigationCard>
+        </div>
+
+        {/* Baseline de custos (se existir) */}
+        {hospital.baseline && (
+          <Card className="hospital-card border-l-4 border-l-secondary">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <TrendingUp className="h-5 w-5 text-secondary" />
+                <span>Baseline de Custos</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="text-center p-4 bg-secondary/5 rounded-lg">
+                  <p className="text-2xl font-bold text-secondary">
+                    {hospital.baseline.quantidade_funcionarios || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Funcionários</p>
+                </div>
+                <div className="text-center p-4 bg-primary/5 rounded-lg">
+                  <p className="text-2xl font-bold text-primary">
+                    R$ {hospital.baseline.custo_total || "0,00"}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Custo Total</p>
+                </div>
+                <div className="text-center p-4 bg-muted/20 rounded-lg">
+                  <p className="text-2xl font-bold">
+                    {hospital.baseline.setores?.length || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Setores/Sítios</p>
+                </div>
+              </div>
+              {hospital.baseline.setores && hospital.baseline.setores.length > 0 && (
+                <div className="mt-4">
+                  <Label className="text-sm font-medium text-muted-foreground mb-2 block">
+                    Setores/Sítios Cadastrados
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {hospital.baseline.setores.map((setor, index) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {setor}
+                        {hospital.baseline?.custo?.[index] && (
+                          <span className="ml-1 text-muted-foreground">
+                            (R$ {hospital.baseline.custo[index]})
+                          </span>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Tabs de conteúdo */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -807,49 +1010,4 @@ export default function HospitalDetails() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => navigate(`/leitos?hospitalId=${id}`)}
-                  >
-                    <Bed className="h-4 w-4 mr-2" />
-                    Status dos Leitos
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="hospital-card">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <TrendingUp className="h-5 w-5 text-secondary" />
-                    <span>Análises e Estatísticas</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4 text-center">
-                    <div className="p-3 bg-primary/5 rounded-lg">
-                      <p className="text-2xl font-bold text-primary">
-                        {Math.round((stats.colaboradoresAtivos / (stats.totalLeitos || 1)) * 10) / 10}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Colaboradores por leito
-                      </p>
-                    </div>
-                    <div className="p-3 bg-secondary/5 rounded-lg">
-                      <p className="text-2xl font-bold text-secondary">
-                        {stats.totalSitios > 0
-                          ? Math.round((stats.sitiosDisponiveis / stats.totalSitios) * 100)
-                          : 0}%
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Sítios disponíveis
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </DashboardLayout>
-  );
-}
+                    className="
