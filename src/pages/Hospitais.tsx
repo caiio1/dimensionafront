@@ -32,6 +32,14 @@ import {
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { MetodoScp } from "@/pages/MetodosScp";
 import CurrencyInput from "@/components/CurrencyInput";
+import { 
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 export interface CriarBaselineDTO {
   hospitalId: string;
@@ -611,11 +619,24 @@ export default function Hospitais() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold">Hospitais</h1>
-            <p className="text-muted-foreground">
-              Gerencie os hospitais do sistema
+          <div className="space-y-2">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="text-2xl font-bold">Hospitais</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+            <p className="text-muted-foreground text-sm">
+              Gerencie a rede hospitalar e suas hierarquias organizacionais
             </p>
+            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
+              <span>{hospitais.length} hospitais cadastrados</span>
+              <span>•</span>
+              <span>{redes.length} redes ativas</span>
+              <span>•</span>
+              <span>{grupos.length} grupos organizacionais</span>
+            </div>
           </div>
 
           <div className="flex items-center space-x-4">
@@ -626,19 +647,33 @@ export default function Hospitais() {
                   Novo Hospital
                 </Button>
               </DialogTrigger>
-              <div className="flex items-center space-x-2 ml-2">
-                {/* Buttons to open small modals for Rede/Grupo/Região */}
-                <Button size="sm" onClick={() => setRedeModalOpen(true)}>
+              <div className="flex items-center space-x-2">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setRedeModalOpen(true)}
+                  className="text-xs"
+                >
                   <Plus className="h-4 w-4 mr-2" />
-                  Criar Rede
+                  Rede
                 </Button>
-                <Button size="sm" onClick={() => setGrupoModalOpen(true)}>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setGrupoModalOpen(true)}
+                  className="text-xs"
+                >
                   <Plus className="h-4 w-4 mr-2" />
-                  Criar Grupo
+                  Grupo
                 </Button>
-                <Button size="sm" onClick={() => setRegiaoModalOpen(true)}>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => setRegiaoModalOpen(true)}
+                  className="text-xs"
+                >
                   <Plus className="h-4 w-4 mr-2" />
-                  Criar Região
+                  Região
                 </Button>
               </div>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -1047,15 +1082,20 @@ export default function Hospitais() {
         </div>
 
         {/* Seção de Filtros Hierárquicos */}
-        <div className=" background-gradient p-4 rounded-lg shadow-lg">
-          <div className="flex items-center gap-6">
+        <Card className="hospital-card border-l-4 border-l-primary">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center space-x-2 text-lg">
+              <Filter className="h-5 w-5 text-primary" />
+              <span>Filtros Organizacionais</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Filtro por Rede */}
-            <div className="flex flex-col">
-              <Label className="text-sm text-white mb-2">
-                Filtrar por Rede
-              </Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Rede</Label>
               <Select value={selectedRede} onValueChange={handleRedeChange}>
-                <SelectTrigger className="w-[200px] bg-white">
+                <SelectTrigger>
                   <SelectValue placeholder="Todas as Redes" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1070,18 +1110,16 @@ export default function Hospitais() {
             </div>
 
             {/* Filtro por Grupo - só habilitado se rede estiver selecionada */}
-            <div className="flex flex-col">
-              <Label className="text-sm text-white mb-2">
-                Filtrar por Grupo
-              </Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Grupo</Label>
               <Select
                 value={selectedGrupo}
                 onValueChange={handleGrupoChange}
                 disabled={selectedRede === "all"}
               >
                 <SelectTrigger
-                  className={`w-[200px] ${
-                    selectedRede !== "all" ? "bg-white" : "bg-gray-100"
+                  className={`${
+                    selectedRede === "all" ? "opacity-50" : ""
                   }`}
                 >
                   <SelectValue placeholder="Todos os Grupos" />
@@ -1098,18 +1136,16 @@ export default function Hospitais() {
             </div>
 
             {/* Filtro por Região - só habilitado se grupo estiver selecionado */}
-            <div className="flex flex-col">
-              <Label className="text-sm text-white mb-2">
-                Filtrar por Região
-              </Label>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Região</Label>
               <Select
                 value={selectedRegiao}
                 onValueChange={handleRegiaoChange}
                 disabled={selectedGrupo === "all"}
               >
                 <SelectTrigger
-                  className={`w-[200px] ${
-                    selectedGrupo !== "all" ? "bg-white" : "bg-gray-100"
+                  className={`${
+                    selectedGrupo === "all" ? "opacity-50" : ""
                   }`}
                 >
                   <SelectValue placeholder="Todas as Regiões" />
@@ -1125,25 +1161,46 @@ export default function Hospitais() {
               </Select>
             </div>
           </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Lista de Hospitais */}
         <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">
-              Hospitais Encontrados ({hospitaisFiltrados.length})
-            </h2>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-xl font-semibold">
+                Hospitais ({hospitaisFiltrados.length})
+              </h2>
+              {(selectedRede !== "all" || selectedGrupo !== "all" || selectedRegiao !== "all") && (
+                <p className="text-sm text-muted-foreground">
+                  Filtros ativos • {hospitais.length - hospitaisFiltrados.length} hospitais ocultos
+                </p>
+              )}
+            </div>
+            {(selectedRede !== "all" || selectedGrupo !== "all" || selectedRegiao !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSelectedRede("all");
+                  setSelectedGrupo("all");
+                  setSelectedRegiao("all");
+                }}
+              >
+                Limpar Filtros
+              </Button>
+            )}
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {hospitaisFiltrados.map((hospital) => (
               <Card
                 key={hospital.id}
-                className="cursor-pointer hover:shadow-md transition-shadow"
+                className="hospital-card cursor-pointer group"
                 onClick={() => navigate(`/hospitais/${hospital.id}`)}
               >
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-lg">
+                  <CardTitle className="text-lg group-hover:text-primary transition-colors">
                     <Building2 className="h-5 w-5 inline mr-2" />
                     {hospital.nome}
                   </CardTitle>
@@ -1152,27 +1209,29 @@ export default function Hospitais() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => handleEdit(hospital)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => handleDelete(hospital.id)}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {hospital.endereco && (
-                      <div className="flex items-center text-sm text-muted-foreground">
+                      <div className="flex items-start text-sm text-muted-foreground">
                         <MapPin className="h-4 w-4 mr-2" />
-                        {hospital.endereco}
+                        <span className="line-clamp-2">{hospital.endereco}</span>
                       </div>
                     )}
                     {hospital.telefone && (
@@ -1182,21 +1241,32 @@ export default function Hospitais() {
                       </div>
                     )}
 
-                    {/* Mostrar hierarquia do hospital */}
-                    <div className="mt-3 pt-2 border-t border-gray-200">
-                      <div className="text-xs text-muted-foreground space-y-1">
+                    {/* Hierarquia organizacional */}
+                    <div className="pt-3 border-t">
+                      <div className="space-y-1">
                         {(() => {
-                          // Prefer nested objects from hospital.regiao -> grupo -> rede
                           const regiao = hospital.regiao || undefined;
                           const grupo = regiao?.grupo;
                           const rede = grupo?.rede;
 
                           return (
-                            <>
-                              {rede && <div>Rede: {rede.nome}</div>}
-                              {grupo && <div>Grupo: {grupo.nome}</div>}
-                              {regiao && <div>Região: {regiao.nome}</div>}
-                            </>
+                            <div className="flex flex-wrap gap-1">
+                              {rede && (
+                                <Badge variant="outline" className="text-xs">
+                                  {rede.nome}
+                                </Badge>
+                              )}
+                              {grupo && (
+                                <Badge variant="outline" className="text-xs">
+                                  {grupo.nome}
+                                </Badge>
+                              )}
+                              {regiao && (
+                                <Badge variant="outline" className="text-xs">
+                                  {regiao.nome}
+                                </Badge>
+                              )}
+                            </div>
                           );
                         })()}
                       </div>
@@ -1215,27 +1285,114 @@ export default function Hospitais() {
                 <h3 className="text-lg font-semibold mb-2">
                   {hospitais.length === 0
                     ? "Nenhum hospital cadastrado"
-                    : "Nenhum hospital encontrado com os filtros selecionados"}
+                    : "Nenhum hospital encontrado"}
                 </h3>
                 <p className="text-muted-foreground text-center mb-4">
                   {hospitais.length === 0
                     ? "Comece criando seu primeiro hospital"
-                    : "Tente ajustar os filtros ou criar um novo hospital"}
+                    : "Ajuste os filtros ou crie um novo hospital"}
                 </p>
-                {(selectedRede !== "all" ||
-                  selectedGrupo !== "all" ||
-                  selectedRegiao !== "all") && (
+                <div className="flex space-x-2">
+                  {hospitais.length === 0 ? (
+                    <Button onClick={handleOpenCreateModal}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Criar Primeiro Hospital
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedRede("all");
+                          setSelectedGrupo("all");
+                          setSelectedRegiao("all");
+                        }}
+                      >
+                        Limpar Filtros
+                      </Button>
+                      <Button onClick={handleOpenCreateModal}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Novo Hospital
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Resumo estatístico quando há filtros ativos */}
+        {(selectedRede !== "all" || selectedGrupo !== "all" || selectedRegiao !== "all") && 
+         hospitaisFiltrados.length > 0 && (
+          <Card className="hospital-card border-l-4 border-l-secondary">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2 text-lg">
+                <BarChart3 className="h-5 w-5 text-secondary" />
+                <span>Resumo da Seleção</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div className="p-3 bg-primary/5 rounded-lg">
+                  <p className="text-2xl font-bold text-primary">
+                    {hospitaisFiltrados.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Hospitais</p>
+                </div>
+                <div className="p-3 bg-secondary/5 rounded-lg">
+                  <p className="text-2xl font-bold text-secondary">
+                    {selectedRede !== "all" ? "1" : redes.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedRede !== "all" ? "Rede" : "Redes"}
+                  </p>
+                </div>
+                <div className="p-3 bg-primary/5 rounded-lg">
+                  <p className="text-2xl font-bold text-primary">
+                    {selectedGrupo !== "all" ? "1" : getGruposFiltrados().length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedGrupo !== "all" ? "Grupo" : "Grupos"}
+                  </p>
+                </div>
+                <div className="p-3 bg-secondary/5 rounded-lg">
+                  <p className="text-2xl font-bold text-secondary">
+                    {selectedRegiao !== "all" ? "1" : getRegioesFiltradas().length}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {selectedRegiao !== "all" ? "Região" : "Regiões"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 pt-3 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Filtros ativos:
+                  </span>
                   <Button
+                    variant="ghost"
+                    size="sm"
                     variant="outline"
                     onClick={() => {
                       setSelectedRede("all");
                       setSelectedGrupo("all");
                       setSelectedRegiao("all");
                     }}
+                    className="text-xs"
                   >
                     Limpar Filtros
                   </Button>
-                )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
+
               </CardContent>
             </Card>
           )}
