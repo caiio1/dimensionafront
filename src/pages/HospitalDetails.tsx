@@ -541,9 +541,9 @@ export default function HospitalDetails() {
                   Tipos cadastrados:
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {Array.from(new Set(unidadesNaoInt.map(u => u.tipo))).map((tipo) => (
-                    <Badge key={tipo} variant="outline" className="text-xs">
-                      {tipo.replace(/_/g, " ")}
+                  {Array.from(new Set(unidadesNaoInt.map(u => u.tipo).filter(Boolean))).map((tipo) => (
+                    <Badge key={String(tipo)} variant="outline" className="text-xs">
+                      {String(tipo).replace(/_/g, " ")}
                     </Badge>
                   ))}
                 </div>
@@ -897,7 +897,7 @@ export default function HospitalDetails() {
                           <div>
                             <p className="font-medium">{unidade.nome}</p>
                             <p className="text-sm text-muted-foreground">
-                              {unidade.tipo.replace(/_/g, " ")} •{" "}
+                              {unidade.tipo ? String(unidade.tipo).replace(/_/g, " ") : ""} •{" "}
                               {unidade.sitiosFuncionais?.length || 0} sítios
                             </p>
                           </div>
