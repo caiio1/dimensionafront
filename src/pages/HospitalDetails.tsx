@@ -167,9 +167,13 @@ export default function HospitalDetails() {
     if (!id) return;
     try {
       const response = await unidadesNaoInternacao.listarPorHospital(id);
-      setUnidadesNaoInt((response as UnidadeNaoInternacao[]) || []);
+      const unidadesData = Array.isArray(response) 
+        ? response 
+        : (response as { data?: UnidadeNaoInternacao[] })?.data || [];
+      setUnidadesNaoInt(unidadesData as UnidadeNaoInternacao[]);
     } catch (error) {
       console.error("Erro ao carregar unidades de não-internação:", error);
+      setUnidadesNaoInt([]); // Garantir que seja array mesmo em caso de erro
     }
   }, [id]);
 
@@ -184,6 +188,7 @@ export default function HospitalDetails() {
       setColaboradores(colaboradoresData as Colaborador[]);
     } catch (error) {
       console.error("Erro ao carregar colaboradores:", error);
+      setColaboradores([]); // Garantir que seja array mesmo em caso de erro
     }
   }, [id]);
 
@@ -230,17 +235,17 @@ export default function HospitalDetails() {
     unidadesInternacao: unidades.length,
     unidadesNaoInternacao: unidadesNaoInt.length,
     totalLeitos: unidades.reduce((acc, u) => acc + (u.numeroLeitos || 0), 0),
-    totalSitios: unidadesNaoInt.reduce(
+    totalSitios: (unidadesNaoInt || []).reduce(
       (acc, u) => acc + (u.sitiosFuncionais?.length || 0),
       0
     ),
-    sitiosDisponiveis: unidadesNaoInt.reduce(
+    sitiosDisponiveis: (unidadesNaoInt || []).reduce(
       (acc, u) =>
         acc +
         (u.sitiosFuncionais?.filter((s) => s.status === "DISPONIVEL")?.length || 0),
       0
     ),
-    colaboradoresAtivos: colaboradores.filter((c) => c.ativo).length,
+    colaboradoresAtivos: (colaboradores || []).filter((c) => c.ativo).length,
     totalColaboradores: colaboradores.length,
   };
 
