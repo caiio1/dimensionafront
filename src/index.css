@@ -387,6 +387,81 @@
   .hospital-card-enhanced:hover::after {
     opacity: 1;
   }
+
+  /* Melhorias para visualização hierárquica */
+  .hierarchy-container {
+    @apply relative;
+  }
+
+  .hierarchy-level-1 {
+    @apply border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-transparent;
+  }
+
+  .hierarchy-level-2 {
+    @apply border-l-2 border-l-green-400 bg-gradient-to-r from-green-50/30 to-transparent;
+  }
+
+  .hierarchy-level-3 {
+    @apply border-l-2 border-l-purple-400 bg-gradient-to-r from-purple-50/30 to-transparent;
+  }
+
+  .hierarchy-level-4 {
+    @apply bg-gradient-to-r from-gray-50/30 to-transparent;
+  }
+
+  /* Animações para expansão/colapso */
+  .hierarchy-expand {
+    animation: expandIn 0.2s ease-out;
+  }
+
+  .hierarchy-collapse {
+    animation: collapseOut 0.2s ease-in;
+  }
+
+  @keyframes expandIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes collapseOut {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Melhorias para cards de hospital */
+  .hospital-mini-card {
+    @apply relative overflow-hidden bg-background border border-border/50 rounded-lg p-4;
+    @apply hover:shadow-md hover:border-primary/30 hover:scale-[1.02];
+    @apply transition-all duration-200 ease-out;
+    @apply before:absolute before:top-0 before:left-0 before:w-full before:h-1;
+    @apply before:bg-gradient-to-r before:from-primary before:to-secondary;
+    @apply before:transform before:scale-x-0 before:transition-transform before:duration-300;
+    @apply hover:before:scale-x-100;
+  }
+
+  /* Filtros aprimorados */
+  .filter-section {
+    @apply bg-gradient-to-r from-muted/30 to-muted/10 rounded-lg p-4 border border-border/30;
+  }
+
+  /* Estados de loading melhorados */
+  .loading-skeleton {
+    @apply animate-pulse bg-gradient-to-r from-muted via-muted/50 to-muted;
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
 }
 
 @layer components {

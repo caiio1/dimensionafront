@@ -1,234 +1,157 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { Plus, Building2, MapPin, Phone, Edit, Trash2, Filter, BarChart3 } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Plus,
+  Building2,
+  Search,
+  Filter,
+  Edit,
+  Trash2,
+  Eye,
+  MapPin,
+  Phone,
+  FileText,
+  Users,
+  Layers3,
+  Activity,
+  ChevronRight,
+  Building,
+  Network,
+  Globe,
+  X,
+  Check,
+  Save,
+  ArrowLeft,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import {
-  hospitaisApi,
-  redesApi,
-  gruposApi,
-  regioesApi,
-  metodosScpApi,
-} from "@/lib/api";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { MetodoScp } from "@/pages/MetodosScp";
-import CurrencyInput from "@/components/CurrencyInput";
-import { 
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-
-export interface CriarBaselineDTO {
-  hospitalId: string;
-  nome: string;
-  quantidade_funcionarios?: number;
-  custo_total?: string;
-  setores?: string[];
-  custo?: string[];
-}
+import { StatsCard } from "@/components/StatsCard";
+import { hospitaisApi, redesApi, gruposApi, regioesApi } from "@/lib/api";
 
 interface Hospital {
   id: string;
   nome: string;
-  cnpj: string;
+  cnpj?: string;
   endereco?: string;
-  baseline?: CriarBaselineDTO;
-  custoTotal?: string;
-  totalFuncionarios?: number;
   telefone?: string;
-  // New backend payload includes nested relations on the hospital object
-  regiao?: Regiao;
+  regiao?: {
+    id: string;
+    nome: string;
+    grupo?: {
+      id: string;
+      nome: string;
+      rede?: {
+        id: string;
+        nome: string;
+      };
+    };
+  };
+  baseline?: {
+    nome: string;
+    quantidade_funcionarios?: number;
+    custo_total?: string;
+  };
+  scpMetodo?: {
+    id: string;
+    key: string;
+    title: string;
+  };
   created_at: string;
 }
 
 interface Rede {
   id: string;
   nome: string;
-  grupos?: Grupo[];
+  descricao?: string;
 }
 
 interface Grupo {
   id: string;
   nome: string;
-  redeId: string;
-  rede?: Rede;
-  regioes?: Regiao[];
+  redeId?: string;
+  descricao?: string;
 }
 
 interface Regiao {
   id: string;
   nome: string;
-  grupoId: string;
-  grupo?: Grupo;
-  hospitais?: Hospital[];
+  grupoId?: string;
+  descricao?: string;
 }
+
+type ViewMode = "grid" | "hierarchy" | "create" | "edit";
 
 export default function Hospitais() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
+  // Estados principais
   const [hospitais, setHospitais] = useState<Hospital[]>([]);
-  const [metodos, setMetodos] = useState<MetodoScp[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
-  const [formData, setFormData] = useState({
-    nome: "",
-    endereco: "",
-    telefone: "",
-    cnpj: "",
-    baselineQuantidadeFuncionarios: "",
-    baselineNome: "",
-  });
-
-  const [baselineSites, setBaselineSites] = useState<
-    { nome: string; custo: string }[]
-  >([]);
-
-  // Filtros hierárquicos
-  const [selectedRede, setSelectedRede] = useState<string>("all");
-  const [selectedGrupo, setSelectedGrupo] = useState<string>("all");
-  const [selectedRegiao, setSelectedRegiao] = useState<string>("all");
-
-  // modal-level selections for creating/editing a hospital
-  const [modalSelectedRede, setModalSelectedRede] = useState<string | null>(
-    null
-  );
-  const [modalSelectedGrupo, setModalSelectedGrupo] = useState<string | null>(
-    null
-  );
-  const [modalSelectedRegiao, setModalSelectedRegiao] = useState<string | null>(
-    null
-  );
-
-  // orchestration state (header)
-  const [createdRedeId, setCreatedRedeId] = useState<string | null>(null);
-  const [createdGrupoId, setCreatedGrupoId] = useState<string | null>(null);
-  const [createdRegiaoId, setCreatedRegiaoId] = useState<string | null>(null);
-
-  // redes/grupos/regioes state
   const [redes, setRedes] = useState<Rede[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [regioes, setRegioes] = useState<Regiao[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [newRedeName, setNewRedeName] = useState("");
-  const [newGrupoName, setNewGrupoName] = useState("");
-  const [newRegiaoName, setNewRegiaoName] = useState("");
-  const [selectedRedeForGrupo, setSelectedRedeForGrupo] = useState<
-    string | null
-  >(null);
-  const [selectedGrupoForRegiao, setSelectedGrupoForRegiao] = useState<
-    string | null
-  >(null);
-  const [redeModalOpen, setRedeModalOpen] = useState(false);
-  const [grupoModalOpen, setGrupoModalOpen] = useState(false);
-  const [regiaoModalOpen, setRegiaoModalOpen] = useState(false);
+  // Estados de interface
+  const [viewMode, setViewMode] = useState<ViewMode>("hierarchy");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedRede, setSelectedRede] = useState<string>("todas");
+  const [selectedGrupo, setSelectedGrupo] = useState<string>("todos");
+  const [selectedRegiao, setSelectedRegiao] = useState<string>("todas");
+  const [editingHospital, setEditingHospital] = useState<Hospital | null>(null);
 
-  const computeBaselineTotal = () =>
-    baselineSites.reduce((acc, s) => {
-      const n = parseBRLToNumber(String(s.custo));
-      return acc + (isNaN(n) ? 0 : n);
-    }, 0);
+  // Estados do formulário
+  const [formData, setFormData] = useState({
+    nome: "",
+    cnpj: "",
+    endereco: "",
+    telefone: "",
+    regiaoId: "",
+  });
 
-  // Format a raw input (or existing value) into Brazilian Real currency string, e.g. "R$ 1.234,56".
-  const formatToBRL = (value: string) => {
-    if (!value) return "";
-    // remove everything except digits and comma/dot and minus
-    const cleaned = String(value).replace(/[^0-9,.-]/g, "");
-    // normalize comma to dot for parsing decimals
-    const normalized = cleaned.replace(/,/g, ".");
-    const parsed = parseFloat(normalized);
-    if (Number.isNaN(parsed)) return "";
-    try {
-      return new Intl.NumberFormat("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      }).format(parsed);
-    } catch (e) {
-      // fallback
-      return parsed.toFixed(2);
+  const normalizeApiResponse = <T,>(response: unknown): T[] => {
+    if (Array.isArray(response)) return response as T[];
+    if (response && typeof response === "object" && "data" in response) {
+      const data = (response as { data?: unknown }).data;
+      if (Array.isArray(data)) return data as T[];
     }
+    return [];
   };
 
-  // Parse a BRL formatted string (or similar) to a Number.
-  const parseBRLToNumber = (value: string) => {
-    if (!value) return 0;
-    // remove currency symbol and spaces
-    let v = String(value).replace(/\s/g, "");
-    // remove any non digit, comma or dot
-    v = v.replace(/[^0-9,.-]/g, "");
-    // Remove thousands separators (.) then replace comma with dot for decimal
-    // e.g. "1.234,56" -> "1234,56" -> "1234.56"
-    v = v.replace(/\./g, "").replace(/,/g, ".");
-    const n = Number(v);
-    return Number.isNaN(n) ? 0 : n;
-  };
-
-  const validarCNPJ = (cnpj: string) => {
-    const regexCNPJ = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
-    return regexCNPJ.test(cnpj);
-  };
-
-  const formatarCNPJ = (valor: string) =>
-    valor
-      .replace(/\D/g, "")
-      .replace(/^(\d{2})(\d)/, "$1.$2")
-      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-      .replace(/\.(\d{3})(\d)/, ".$1/$2")
-      .replace(/(\d{4})(\d)/, "$1-$2")
-      .slice(0, 18);
-
-  const validarTelefone = (telefone: string) => {
-    const regexTelefone = /^\(?\d{2}\)?\s?\d{4,5}-?\d{4}$/;
-    return regexTelefone.test(telefone);
-  };
-
-  const formatarTelefone = (valor: string) =>
-    valor
-      .replace(/\D/g, "")
-      .replace(/^(\d{2})(\d)/g, "($1) $2")
-      .replace(/(\d{5})(\d)/, "$1-$2")
-      .slice(0, 15);
-
-  const carregarHospitais = useCallback(async () => {
+  const carregarDados = useCallback(async () => {
+    setLoading(true);
     try {
-      const response = await hospitaisApi.listar();
-      const list = Array.isArray(response)
-        ? response
-        : response && typeof response === "object" && (response as any).data
-        ? (response as any).data
-        : [];
+      const [hospitaisResp, redesResp, gruposResp, regioesResp] = await Promise.all([
+        hospitaisApi.listar().catch(() => []),
+        redesApi.listar().catch(() => []),
+        gruposApi.listar().catch(() => []),
+        regioesApi.listar().catch(() => []),
+      ]);
 
-      setHospitais(list as Hospital[]);
+      setHospitais(normalizeApiResponse<Hospital>(hospitaisResp));
+      setRedes(normalizeApiResponse<Rede>(redesResp));
+      setGrupos(normalizeApiResponse<Grupo>(gruposResp));
+      setRegioes(normalizeApiResponse<Regiao>(regioesResp));
     } catch (error) {
-      console.error("❌ Erro ao carregar hospitais:", error);
+      console.error("Erro ao carregar dados:", error);
       toast({
         title: "Erro",
-        description: "Erro ao carregar hospitais",
+        description: "Erro ao carregar dados dos hospitais",
         variant: "destructive",
       });
     } finally {
@@ -236,222 +159,63 @@ export default function Hospitais() {
     }
   }, [toast]);
 
-  const carregarRedes = async () => {
-    try {
-      const r: any = await redesApi.listar();
-      const processedRedes = Array.isArray(r) ? r : (r && r.data) || [];
-      setRedes(processedRedes);
-    } catch (err) {
-      console.error("❌ Erro ao carregar redes:", err);
-    }
-  };
-
-  const carregarGrupos = async () => {
-    try {
-      const g: any = await gruposApi.listar();
-      const processedGrupos = Array.isArray(g) ? g : (g && g.data) || [];
-      setGrupos(processedGrupos);
-    } catch (err) {
-      console.error("❌ Erro ao carregar grupos:", err);
-    }
-  };
-
-  const carregarRegioes = async () => {
-    try {
-      const rg: any = await regioesApi.listar();
-      const processedRegioes = Array.isArray(rg) ? rg : (rg && rg.data) || [];
-      setRegioes(processedRegioes);
-    } catch (err) {
-      console.error("❌ Erro ao carregar regiões:", err);
-    }
-  };
-
   useEffect(() => {
-    carregarHospitais();
-    carregarRedes();
-    carregarGrupos();
-    carregarRegioes();
-  }, [carregarHospitais]);
+    carregarDados();
+  }, [carregarDados]);
 
-  const carregarMetodos = async () => {
-    try {
-      const met = (await metodosScpApi.listar()) as MetodoScp[];
-      setMetodos(met);
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar métodos SCP",
-        variant: "destructive",
-      });
-    }
-  };
+  // Filtros aplicados
+  const hospitaisFiltrados = hospitais.filter((hospital) => {
+    const matchesSearch = hospital.nome.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRede = selectedRede === "todas" || hospital.regiao?.grupo?.rede?.id === selectedRede;
+    const matchesGrupo = selectedGrupo === "todos" || hospital.regiao?.grupo?.id === selectedGrupo;
+    const matchesRegiao = selectedRegiao === "todas" || hospital.regiao?.id === selectedRegiao;
+    
+    return matchesSearch && matchesRede && matchesGrupo && matchesRegiao;
+  });
 
-  // Função para obter grupos filtrados pela rede selecionada
-  const getGruposFiltrados = () => {
-    if (selectedRede === "all") return [];
-    return grupos.filter(
-      (grupo) =>
-        grupo.redeId === selectedRede ||
-        (grupo.rede && grupo.rede.id === selectedRede)
-    );
-  };
+  // Organização hierárquica
+  const organizacaoHierarquica = redes.map((rede) => {
+    const gruposRede = grupos.filter((g) => g.redeId === rede.id);
+    return {
+      rede,
+      grupos: gruposRede.map((grupo) => {
+        const regioesGrupo = regioes.filter((r) => r.grupoId === grupo.id);
+        return {
+          grupo,
+          regioes: regioesGrupo.map((regiao) => {
+            const hospitaisRegiao = hospitais.filter((h) => h.regiao?.id === regiao.id);
+            return {
+              regiao,
+              hospitais: hospitaisRegiao,
+            };
+          }),
+        };
+      }),
+    };
+  });
 
-  // Função para obter regiões filtradas pelo grupo selecionado
-  const getRegioesFiltradas = () => {
-    if (selectedGrupo === "all") return [];
-    return regioes.filter(
-      (regiao) =>
-        regiao.grupoId === selectedGrupo ||
-        (regiao.grupo && regiao.grupo.id === selectedGrupo)
-    );
-  };
-
-  // Função principal de filtro dos hospitais
-  const getHospitaisFiltrados = () => {
-    // If no filters are active, return all hospitals
-    if (
-      selectedRede === "all" &&
-      selectedGrupo === "all" &&
-      selectedRegiao === "all"
-    ) {
-      return hospitais;
-    }
-
-    // Assume each hospital includes nested `regiao` -> `grupo` -> `rede`
-    return hospitais.filter((hospital) => {
-      const regiaoObj = hospital.regiao;
-      const grupoObj = regiaoObj?.grupo;
-      const redeObj = grupoObj?.rede;
-
-      const matchesRegiao =
-        selectedRegiao === "all" || regiaoObj?.id === selectedRegiao;
-      const matchesGrupo =
-        selectedGrupo === "all" || grupoObj?.id === selectedGrupo;
-      const matchesRede =
-        selectedRede === "all" || redeObj?.id === selectedRede;
-
-      return matchesRegiao && matchesGrupo && matchesRede;
-    });
-  };
-
-  // Handler para mudança de rede
-  const handleRedeChange = (value: string) => {
-    console.log("\n🔄 MUDANÇA DE REDE:", value);
-    setSelectedRede(value);
-    setSelectedGrupo("all"); // Reset grupo
-    setSelectedRegiao("all"); // Reset região
-    console.log("🔄 Estados resetados: grupo=all, regiao=all");
-  };
-
-  // Handler para mudança de grupo
-  const handleGrupoChange = (value: string) => {
-    console.log("\n🔄 MUDANÇA DE GRUPO:", value);
-    setSelectedGrupo(value);
-    setSelectedRegiao("all"); // Reset região
-    console.log("🔄 Estado resetado: regiao=all");
-  };
-
-  // Handler para mudança de região
-  const handleRegiaoChange = (value: string) => {
-    console.log("\n🔄 MUDANÇA DE REGIÃO:", value);
-    setSelectedRegiao(value);
-  };
-
-  const handleOpenCreateModal = () => {
-    setEditingHospital(null);
-    setFormData({
-      nome: "",
-      endereco: "",
-      telefone: "",
-      cnpj: "",
-      baselineQuantidadeFuncionarios: "",
-      baselineNome: "",
-    });
-    setBaselineSites([]);
-    // reset modal-level selects
-    setModalSelectedRede(null);
-    setModalSelectedGrupo(null);
-    setModalSelectedRegiao(null);
-    setDialogOpen(true);
-    carregarMetodos();
-  };
-
-  const handleCloseModal = () => {
-    setDialogOpen(false);
-    setEditingHospital(null);
-    setFormData({
-      nome: "",
-      endereco: "",
-      telefone: "",
-      cnpj: "",
-      baselineQuantidadeFuncionarios: "",
-      baselineNome: "",
-    });
-    setBaselineSites([]);
-  };
+  // Hospitais sem hierarquia definida
+  const hospitaisSemHierarquia = hospitais.filter((h) => !h.regiao);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.nome.trim()) {
       toast({
         title: "Nome obrigatório",
-        description: "O nome do hospital é obrigatório",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (!formData.cnpj.trim()) {
-      toast({
-        title: "CNPJ obrigatório",
-        description: "O CNPJ do hospital é obrigatório",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (formData.cnpj && !validarCNPJ(formData.cnpj)) {
-      toast({
-        title: "CNPJ inválido",
-        description: "Digite um CNPJ válido. Ex: 12.345.678/0001-90",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (formData.telefone && !validarTelefone(formData.telefone)) {
-      toast({
-        title: "Telefone inválido",
-        description: "Digite um telefone válido. Ex: (11) 99999-9999",
+        description: "Informe o nome do hospital",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const payload: any = {
+      const payload = {
         nome: formData.nome,
+        cnpj: formData.cnpj || undefined,
         endereco: formData.endereco || undefined,
         telefone: formData.telefone || undefined,
-        cnpj: formData.cnpj || undefined,
-        // use region selected inside modal if present, otherwise fallback to orchestration-created id
-        regiaoId: modalSelectedRegiao || createdRegiaoId || undefined,
+        regiaoId: formData.regiaoId || undefined,
       };
-      const baselineProvided =
-        formData.baselineNome ||
-        formData.baselineQuantidadeFuncionarios ||
-        baselineSites.length > 0;
-      if (baselineProvided) {
-        payload.baseline = {
-          nome: `baseline_${formData.nome}`,
-          quantidade_funcionarios: formData.baselineQuantidadeFuncionarios
-            ? Number(formData.baselineQuantidadeFuncionarios)
-            : undefined,
-          // send numeric strings for API (use dot as decimal separator)
-          custo_total: String(computeBaselineTotal().toFixed(2)),
-          setores: baselineSites.map((s) => s.nome).filter(Boolean),
-          custo: baselineSites
-            .map((s) => String(parseBRLToNumber(String(s.custo)).toFixed(2)))
-            .filter(Boolean),
-        } as any;
-      }
 
       if (editingHospital) {
         await hospitaisApi.atualizar(editingHospital.id, payload);
@@ -461,14 +225,20 @@ export default function Hospitais() {
         });
       } else {
         await hospitaisApi.criar(payload);
-        toast({ title: "Sucesso", description: "Hospital criado com sucesso" });
+        toast({
+          title: "Sucesso",
+          description: "Hospital criado com sucesso",
+        });
       }
-      handleCloseModal();
-      carregarHospitais();
-    } catch (error: any) {
+
+      setViewMode("hierarchy");
+      setEditingHospital(null);
+      setFormData({ nome: "", cnpj: "", endereco: "", telefone: "", regiaoId: "" });
+      carregarDados();
+    } catch (error) {
       toast({
         title: "Erro",
-        description: error.message || "Erro ao salvar hospital",
+        description: "Erro ao salvar hospital",
         variant: "destructive",
       });
     }
@@ -478,139 +248,46 @@ export default function Hospitais() {
     setEditingHospital(hospital);
     setFormData({
       nome: hospital.nome,
+      cnpj: hospital.cnpj || "",
       endereco: hospital.endereco || "",
       telefone: hospital.telefone || "",
-      cnpj: hospital.cnpj || "",
-      baselineQuantidadeFuncionarios:
-        hospital.baseline?.quantidade_funcionarios?.toString() || "",
-      baselineNome: hospital.baseline?.nome || `baseline_${hospital.nome}`,
+      regiaoId: hospital.regiao?.id || "",
     });
-    if (hospital.baseline) {
-      const setores = (hospital.baseline.setores || []).map((s, i) => ({
-        nome: s,
-        custo: formatToBRL(hospital.baseline?.custo?.[i] || ""),
-      }));
-      setBaselineSites(setores);
-    } else {
-      setBaselineSites([]);
-    }
-    // set modal-level selects from hospital (assume nested objects present)
-    const regiaoObj = hospital.regiao;
-    const grupoObj = regiaoObj?.grupo;
-    const redeObj = grupoObj?.rede;
-
-    setModalSelectedRede(redeObj?.id || null);
-    setModalSelectedGrupo(grupoObj?.id || null);
-    setModalSelectedRegiao(regiaoObj?.id || null);
-    setDialogOpen(true);
-    carregarMetodos();
+    setViewMode("edit");
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este hospital?")) return;
+
     try {
       await hospitaisApi.excluir(id);
-      toast({ title: "Sucesso", description: "Hospital excluído com sucesso" });
-      carregarHospitais();
-    } catch (error: any) {
+      toast({
+        title: "Sucesso",
+        description: "Hospital excluído com sucesso",
+      });
+      carregarDados();
+    } catch (error) {
       toast({
         title: "Erro",
-        description: error.message || "Erro ao excluir hospital",
+        description: "Erro ao excluir hospital",
         variant: "destructive",
       });
     }
   };
 
-  const criarRedeLocal = async () => {
-    if (!newRedeName.trim()) {
-      return toast({
-        title: "Nome da rede obrigatório",
-        variant: "destructive",
-      });
-    }
-    try {
-      const r: any = await redesApi.criar({ nome: newRedeName });
-      const id = r?.id || r?.data?.id;
-      setNewRedeName("");
-      carregarRedes();
-      toast({ title: "Rede criada" });
-      setRedeModalOpen(false);
-      if (id) setCreatedRedeId(id);
-    } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: err?.message || String(err),
-        variant: "destructive",
-      });
-    }
+  const resetForm = () => {
+    setFormData({ nome: "", cnpj: "", endereco: "", telefone: "", regiaoId: "" });
+    setEditingHospital(null);
+    setViewMode("hierarchy");
   };
 
-  const criarGrupoLocal = async () => {
-    if (!newGrupoName.trim()) {
-      return toast({
-        title: "Nome do grupo obrigatório",
-        variant: "destructive",
-      });
-    }
-    const redeIdToUse = selectedRedeForGrupo || createdRedeId;
-    if (!redeIdToUse) {
-      return toast({
-        title: "Selecione uma rede para criar o grupo",
-        variant: "destructive",
-      });
-    }
-    try {
-      const g: any = await gruposApi.criar({
-        nome: newGrupoName,
-        redeId: redeIdToUse,
-      });
-      setNewGrupoName("");
-      carregarGrupos();
-      toast({ title: "Grupo criado" });
-      setGrupoModalOpen(false);
-      const id = g?.id || g?.data?.id;
-      if (id) setCreatedGrupoId(id);
-    } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: err?.message || String(err),
-        variant: "destructive",
-      });
-    }
-  };
-
-  const criarRegiaoLocal = async () => {
-    if (!newRegiaoName.trim()) {
-      return toast({
-        title: "Nome da região obrigatório",
-        variant: "destructive",
-      });
-    }
-    const grupoIdToUse = selectedGrupoForRegiao || createdGrupoId;
-    if (!grupoIdToUse) {
-      return toast({
-        title: "Selecione um grupo para criar a região",
-        variant: "destructive",
-      });
-    }
-    try {
-      const rg: any = await regioesApi.criar({
-        nome: newRegiaoName,
-        grupoId: grupoIdToUse,
-      });
-      setNewRegiaoName("");
-      carregarRegioes();
-      toast({ title: "Região criada" });
-      setRegiaoModalOpen(false);
-      const id = rg?.id || rg?.data?.id;
-      if (id) setCreatedRegiaoId(id);
-    } catch (err: any) {
-      toast({
-        title: "Erro",
-        description: err?.message || String(err),
-        variant: "destructive",
-      });
-    }
+  // Estatísticas gerais
+  const stats = {
+    totalHospitais: hospitais.length,
+    totalRedes: redes.length,
+    totalGrupos: grupos.length,
+    totalRegioes: regioes.length,
+    hospitaisFiltrados: hospitaisFiltrados.length,
   };
 
   if (loading) {
@@ -623,781 +300,627 @@ export default function Hospitais() {
     );
   }
 
-  const hospitaisFiltrados = getHospitaisFiltrados();
-
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div className="space-y-2">
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbPage className="text-2xl font-bold">Hospitais</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-            <p className="text-muted-foreground text-sm">
-              Gerencie a rede hospitalar e suas hierarquias organizacionais
-            </p>
-            <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-              <span>{hospitais.length} hospitais cadastrados</span>
-              <span>•</span>
-              <span>{redes.length} redes ativas</span>
-              <span>•</span>
-              <span>{grupos.length} grupos organizacionais</span>
+  // Formulário de criação/edição
+  if (viewMode === "create" || viewMode === "edit") {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6">
+          {/* Header do formulário */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" onClick={resetForm}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
+              </Button>
+              <div>
+                <h1 className="text-3xl font-bold">
+                  {viewMode === "edit" ? "Editar Hospital" : "Novo Hospital"}
+                </h1>
+                <p className="text-muted-foreground">
+                  {viewMode === "edit" 
+                    ? "Atualize as informações do hospital"
+                    : "Preencha os dados para criar um novo hospital"
+                  }
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={handleOpenCreateModal}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Hospital
-                </Button>
-              </DialogTrigger>
-              <div className="flex items-center space-x-2">
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setRedeModalOpen(true)}
-                  className="text-xs"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Rede
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setGrupoModalOpen(true)}
-                  className="text-xs"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Grupo
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  onClick={() => setRegiaoModalOpen(true)}
-                  className="text-xs"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Região
-                </Button>
-              </div>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingHospital ? "Editar Hospital" : "Novo Hospital"}
-                  </DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
+          {/* Formulário */}
+          <Card className="max-w-4xl">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                <span>Informações do Hospital</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
                     <Label htmlFor="nome">Nome do Hospital *</Label>
                     <Input
                       id="nome"
                       value={formData.nome}
-                      onChange={(e) =>
-                        setFormData({ ...formData, nome: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                      placeholder="Ex: Hospital Central"
                       required
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="cnpj">CNPJ *</Label>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cnpj">CNPJ</Label>
                     <Input
                       id="cnpj"
                       value={formData.cnpj}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          cnpj: formatarCNPJ(e.target.value),
-                        })
-                      }
+                      onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
                       placeholder="00.000.000/0000-00"
-                      required
                     />
                   </div>
-                  <div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="telefone">Telefone</Label>
                     <Input
                       id="telefone"
                       value={formData.telefone}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          telefone: formatarTelefone(e.target.value),
-                        })
-                      }
+                      onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
                       placeholder="(11) 99999-9999"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="endereco">Endereço</Label>
-                    <Textarea
-                      id="endereco"
-                      value={formData.endereco}
-                      onChange={(e) =>
-                        setFormData({ ...formData, endereco: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <Label>Rede</Label>
-                      <Select
-                        value={modalSelectedRede ?? undefined}
-                        onValueChange={(v) => {
-                          setModalSelectedRede(
-                            v === "__none__" ? null : v || null
-                          );
-                          setModalSelectedGrupo(null);
-                          setModalSelectedRegiao(null);
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecione a rede" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Nenhuma</SelectItem>
-                          {redes.map((r) => (
-                            <SelectItem key={r.id} value={r.id}>
-                              {r.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Grupo</Label>
-                      <Select
-                        value={modalSelectedGrupo ?? undefined}
-                        onValueChange={(v) => {
-                          setModalSelectedGrupo(
-                            v === "__none__" ? null : v || null
-                          );
-                          setModalSelectedRegiao(null);
-                        }}
-                        disabled={!modalSelectedRede}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              modalSelectedRede
-                                ? "Selecione o grupo"
-                                : "Selecione uma rede primeiro"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Nenhuma</SelectItem>
-                          {grupos
-                            .filter((g) =>
-                              modalSelectedRede
-                                ? g.redeId === modalSelectedRede ||
-                                  g.rede?.id === modalSelectedRede
-                                : false
-                            )
-                            .map((g) => (
-                              <SelectItem key={g.id} value={g.id}>
-                                {g.nome}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Região</Label>
-                      <Select
-                        value={modalSelectedRegiao ?? undefined}
-                        onValueChange={(v) =>
-                          setModalSelectedRegiao(
-                            v === "__none__" ? null : v || null
-                          )
-                        }
-                        disabled={!modalSelectedGrupo}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              modalSelectedGrupo
-                                ? "Selecione a região"
-                                : "Selecione um grupo primeiro"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Nenhuma</SelectItem>
-                          {regioes
-                            .filter((r) =>
-                              modalSelectedGrupo
-                                ? r.grupoId === modalSelectedGrupo ||
-                                  r.grupo?.id === modalSelectedGrupo
-                                : false
-                            )
-                            .map((r) => (
-                              <SelectItem key={r.id} value={r.id}>
-                                {r.nome}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="baselineQuantidadeFuncionarios">
-                        Qtde. Funcionários
-                      </Label>
-                      <Input
-                        id="baselineQuantidadeFuncionarios"
-                        type="number"
-                        value={formData.baselineQuantidadeFuncionarios}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            baselineQuantidadeFuncionarios: e.target.value,
-                          })
-                        }
-                        readOnly={!!editingHospital}
-                      />
-                    </div>
-                    <div>
-                      <Label> Custo Total </Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          readOnly
-                          value={formatToBRL(String(computeBaselineTotal()))}
-                          placeholder="R$ 0,00"
-                        />
-                      </div>
-                    </div>
-                  </div>
+
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label>Sítios / Setores</Label>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() =>
-                          setBaselineSites((s) => [
-                            ...s,
-                            { nome: "", custo: "" },
-                          ])
-                        }
-                        disabled={!!editingHospital}
-                        title={
-                          editingHospital
-                            ? "Baseline não editável durante edição"
-                            : undefined
-                        }
-                      >
-                        Adicionar Setor/Sítio
-                      </Button>
-                    </div>
-                    {baselineSites.map((site, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-3 gap-2 items-end"
-                      >
-                        <div>
-                          <Label>Nome do sítio</Label>
-                          <Input
-                            value={site.nome}
-                            onChange={
-                              !editingHospital
-                                ? (e) =>
-                                    setBaselineSites((prev) => {
-                                      const copy = [...prev];
-                                      copy[idx] = {
-                                        ...copy[idx],
-                                        nome: e.target.value,
-                                      };
-                                      return copy;
-                                    })
-                                : undefined
-                            }
-                            readOnly={!!editingHospital}
-                          />
-                        </div>
-                        <div>
-                          <Label>Custo</Label>
-                          <CurrencyInput
-                            value={site.custo} // valor sem formatação
-                            onChange={(value) => {
-                              setBaselineSites((prev) => {
-                                const copy = [...prev];
-                                copy[idx] = {
-                                  ...copy[idx],
-                                  custo: value, // armazenar cru
-                                };
-                                return copy;
-                              });
-                            }}
-                            placeholder="R$ 0,00"
-                          />
-                        </div>
-                        <div className="flex items-center">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={
-                              !editingHospital
-                                ? () =>
-                                    setBaselineSites((prev) =>
-                                      prev.filter((_, i) => i !== idx)
-                                    )
-                                : undefined
-                            }
-                            disabled={!!editingHospital}
-                          >
-                            Remover
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCloseModal}
+                    <Label htmlFor="regiao">Região</Label>
+                    <Select
+                      value={formData.regiaoId}
+                      onValueChange={(value) => setFormData({ ...formData, regiaoId: value })}
                     >
-                      Cancelar
-                    </Button>
-                    <Button type="submit">
-                      {editingHospital ? "Atualizar" : "Criar"}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            {/* Rede modal */}
-            <Dialog open={redeModalOpen} onOpenChange={setRedeModalOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Rede</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <Input
-                    placeholder="Nome da rede"
-                    value={newRedeName}
-                    onChange={(e) => setNewRedeName(e.target.value)}
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => setRedeModalOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={criarRedeLocal} className="ml-2">
-                      Criar
-                    </Button>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma região" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regioes.map((regiao) => (
+                          <SelectItem key={regiao.id} value={regiao.id}>
+                            {regiao.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-              </DialogContent>
-            </Dialog>
 
-            {/* Grupo modal */}
-            <Dialog open={grupoModalOpen} onOpenChange={setGrupoModalOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Grupo</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <Input
-                    placeholder="Nome do grupo"
-                    value={newGrupoName}
-                    onChange={(e) => setNewGrupoName(e.target.value)}
+                <div className="space-y-2">
+                  <Label htmlFor="endereco">Endereço</Label>
+                  <Textarea
+                    id="endereco"
+                    value={formData.endereco}
+                    onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                    placeholder="Endereço completo do hospital"
+                    rows={3}
                   />
-                  <Select
-                    value={selectedRedeForGrupo ?? undefined}
-                    onValueChange={(value) =>
-                      setSelectedRedeForGrupo(value || null)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione a rede" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {redes.map((r) => (
-                        <SelectItem key={r.id} value={r.id}>
-                          {r.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => setGrupoModalOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={criarGrupoLocal} className="ml-2">
-                      Criar
-                    </Button>
-                  </div>
                 </div>
-              </DialogContent>
-            </Dialog>
 
-            {/* Região modal */}
-            <Dialog open={regiaoModalOpen} onOpenChange={setRegiaoModalOpen}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Criar Região</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-3">
-                  <Input
-                    placeholder="Nome da região"
-                    value={newRegiaoName}
-                    onChange={(e) => setNewRegiaoName(e.target.value)}
-                  />
-                  <Select
-                    value={selectedGrupoForRegiao ?? undefined}
-                    onValueChange={(value) =>
-                      setSelectedGrupoForRegiao(value || null)
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Selecione o grupo" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {grupos.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>
-                          {g.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="flex justify-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => setRegiaoModalOpen(false)}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button onClick={criarRegiaoLocal} className="ml-2">
-                      Criar
-                    </Button>
-                  </div>
+                <div className="flex justify-end space-x-3">
+                  <Button type="button" variant="outline" onClick={resetForm}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit">
+                    <Save className="h-4 w-4 mr-2" />
+                    {viewMode === "edit" ? "Atualizar" : "Criar"} Hospital
+                  </Button>
                 </div>
-              </DialogContent>
-            </Dialog>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="space-y-6">
+        {/* Header principal */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold flex items-center space-x-3">
+              <Building2 className="h-8 w-8 text-primary" />
+              <span>Gestão de Hospitais</span>
+            </h1>
+            <p className="text-muted-foreground">
+              Gerencie a rede hospitalar e suas hierarquias organizacionais
+            </p>
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Globe className="h-4 w-4" />
+                {stats.totalRedes} redes
+              </span>
+              <span className="flex items-center gap-1">
+                <Network className="h-4 w-4" />
+                {stats.totalGrupos} grupos
+              </span>
+              <span className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                {stats.totalRegioes} regiões
+              </span>
+              <span className="flex items-center gap-1">
+                <Building className="h-4 w-4" />
+                {stats.totalHospitais} hospitais
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 bg-muted/50 rounded-lg p-1">
+              <Button
+                variant={viewMode === "hierarchy" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("hierarchy")}
+              >
+                <Network className="h-4 w-4 mr-1" />
+                Hierarquia
+              </Button>
+              <Button
+                variant={viewMode === "grid" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+              >
+                <Building2 className="h-4 w-4 mr-1" />
+                Lista
+              </Button>
+            </div>
+            <Button onClick={() => setViewMode("create")} className="hospital-button-primary">
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Hospital
+            </Button>
           </div>
         </div>
 
-        {/* Seção de Filtros Hierárquicos */}
-        <Card className="hospital-card border-l-4 border-l-primary">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center space-x-2 text-lg">
+        {/* Métricas principais */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatsCard
+            title="Total de Hospitais"
+            value={stats.totalHospitais}
+            icon={Building2}
+            description="na rede"
+          />
+          <StatsCard
+            title="Redes Ativas"
+            value={stats.totalRedes}
+            icon={Globe}
+            description="organizações"
+          />
+          <StatsCard
+            title="Grupos"
+            value={stats.totalGrupos}
+            icon={Network}
+            description="regionais"
+          />
+          <StatsCard
+            title="Regiões"
+            value={stats.totalRegioes}
+            icon={MapPin}
+            description="geográficas"
+          />
+        </div>
+
+        {/* Filtros avançados */}
+        <Card className="hospital-card">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
               <Filter className="h-5 w-5 text-primary" />
-              <span>Filtros Organizacionais</span>
+              <span>Filtros e Busca</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Filtro por Rede */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Rede</Label>
-              <Select value={selectedRede} onValueChange={handleRedeChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas as Redes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Redes</SelectItem>
-                  {redes.map((rede) => (
-                    <SelectItem key={rede.id} value={rede.id}>
-                      {rede.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-2">
+                <Label>Buscar Hospital</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Nome do hospital..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Rede</Label>
+                <Select value={selectedRede} onValueChange={setSelectedRede}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as Redes</SelectItem>
+                    {redes.map((rede) => (
+                      <SelectItem key={rede.id} value={rede.id}>
+                        {rede.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Grupo</Label>
+                <Select value={selectedGrupo} onValueChange={setSelectedGrupo}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Grupos</SelectItem>
+                    {grupos
+                      .filter((g) => selectedRede === "todas" || g.redeId === selectedRede)
+                      .map((grupo) => (
+                        <SelectItem key={grupo.id} value={grupo.id}>
+                          {grupo.nome}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Região</Label>
+                <Select value={selectedRegiao} onValueChange={setSelectedRegiao}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as Regiões</SelectItem>
+                    {regioes
+                      .filter((r) => selectedGrupo === "todos" || r.grupoId === selectedGrupo)
+                      .map((regiao) => (
+                        <SelectItem key={regiao.id} value={regiao.id}>
+                          {regiao.nome}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {/* Filtro por Grupo - só habilitado se rede estiver selecionada */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Grupo</Label>
-              <Select
-                value={selectedGrupo}
-                onValueChange={handleGrupoChange}
-                disabled={selectedRede === "all"}
-              >
-                <SelectTrigger
-                  className={`${
-                    selectedRede === "all" ? "opacity-50" : ""
-                  }`}
+            {(searchTerm || selectedRede !== "todas" || selectedGrupo !== "todos" || selectedRegiao !== "todas") && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {hospitaisFiltrados.length} de {hospitais.length} hospitais
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedRede("todas");
+                    setSelectedGrupo("todos");
+                    setSelectedRegiao("todas");
+                  }}
                 >
-                  <SelectValue placeholder="Todos os Grupos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Grupos</SelectItem>
-                  {getGruposFiltrados().map((grupo) => (
-                    <SelectItem key={grupo.id} value={grupo.id}>
-                      {grupo.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Filtro por Região - só habilitado se grupo estiver selecionado */}
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Região</Label>
-              <Select
-                value={selectedRegiao}
-                onValueChange={handleRegiaoChange}
-                disabled={selectedGrupo === "all"}
-              >
-                <SelectTrigger
-                  className={`${
-                    selectedGrupo === "all" ? "opacity-50" : ""
-                  }`}
-                >
-                  <SelectValue placeholder="Todas as Regiões" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as Regiões</SelectItem>
-                  {getRegioesFiltradas().map((regiao) => (
-                    <SelectItem key={regiao.id} value={regiao.id}>
-                      {regiao.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                  <X className="h-4 w-4 mr-1" />
+                  Limpar Filtros
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Lista de Hospitais */}
-        <div className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h2 className="text-xl font-semibold">
-                Hospitais ({hospitaisFiltrados.length})
-              </h2>
-              {(selectedRede !== "all" || selectedGrupo !== "all" || selectedRegiao !== "all") && (
-                <p className="text-sm text-muted-foreground">
-                  Filtros ativos • {hospitais.length - hospitaisFiltrados.length} hospitais ocultos
-                </p>
-              )}
-            </div>
-            {(selectedRede !== "all" || selectedGrupo !== "all" || selectedRegiao !== "all") && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedRede("all");
-                  setSelectedGrupo("all");
-                  setSelectedRegiao("all");
-                }}
-              >
-                Limpar Filtros
-              </Button>
-            )}
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {hospitaisFiltrados.map((hospital) => (
-              <Card
-                key={hospital.id}
-                className="hospital-card cursor-pointer group"
-                onClick={() => navigate(`/hospitais/${hospital.id}`)}
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                    <Building2 className="h-5 w-5 inline mr-2" />
-                    {hospital.nome}
+        {/* Conteúdo baseado no modo de visualização */}
+        {viewMode === "hierarchy" ? (
+          <div className="space-y-8">
+            {/* Visualização hierárquica */}
+            {organizacaoHierarquica.map((redeItem) => (
+              <Card key={redeItem.rede.id} className="hospital-card border-l-4 border-l-blue-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-3">
+                    <Globe className="h-6 w-6 text-blue-600" />
+                    <span className="text-xl">{redeItem.rede.nome}</span>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                      Rede
+                    </Badge>
                   </CardTitle>
-                  <div
-                    className="flex space-x-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(hospital)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(hospital.id)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  {redeItem.rede.descricao && (
+                    <p className="text-sm text-muted-foreground">{redeItem.rede.descricao}</p>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {hospital.endereco && (
-                      <div className="flex items-start text-sm text-muted-foreground">
-                        <MapPin className="h-4 w-4 mr-2" />
-                        <span className="line-clamp-2">{hospital.endereco}</span>
+                <CardContent className="space-y-6">
+                  {redeItem.grupos.map((grupoItem) => (
+                    <div key={grupoItem.grupo.id} className="border-l-2 border-l-green-300 pl-4">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <Network className="h-5 w-5 text-green-600" />
+                        <span className="text-lg font-semibold">{grupoItem.grupo.nome}</span>
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          Grupo
+                        </Badge>
                       </div>
-                    )}
-                    {hospital.telefone && (
-                      <div className="flex items-center text-sm text-muted-foreground">
-                        <Phone className="h-4 w-4 mr-2" />
-                        {hospital.telefone}
-                      </div>
-                    )}
-
-                    {/* Hierarquia organizacional */}
-                    <div className="pt-3 border-t">
-                      <div className="space-y-1">
-                        {(() => {
-                          const regiao = hospital.regiao || undefined;
-                          const grupo = regiao?.grupo;
-                          const rede = grupo?.rede;
-
-                          return (
-                            <div className="flex flex-wrap gap-1">
-                              {rede && (
-                                <Badge variant="outline" className="text-xs">
-                                  {rede.nome}
-                                </Badge>
-                              )}
-                              {grupo && (
-                                <Badge variant="outline" className="text-xs">
-                                  {grupo.nome}
-                                </Badge>
-                              )}
-                              {regiao && (
-                                <Badge variant="outline" className="text-xs">
-                                  {regiao.nome}
-                                </Badge>
-                              )}
+                      
+                      <div className="space-y-4">
+                        {grupoItem.regioes.map((regiaoItem) => (
+                          <div key={regiaoItem.regiao.id} className="border-l-2 border-l-purple-300 pl-4">
+                            <div className="flex items-center space-x-3 mb-3">
+                              <MapPin className="h-4 w-4 text-purple-600" />
+                              <span className="font-medium">{regiaoItem.regiao.nome}</span>
+                              <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                Região
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {regiaoItem.hospitais.length} hospital(is)
+                              </span>
                             </div>
-                          );
-                        })()}
+                            
+                            {regiaoItem.hospitais.length > 0 ? (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {regiaoItem.hospitais
+                                  .filter((h) => 
+                                    h.nome.toLowerCase().includes(searchTerm.toLowerCase())
+                                  )
+                                  .map((hospital) => (
+                                    <HospitalCard
+                                      key={hospital.id}
+                                      hospital={hospital}
+                                      onView={() => navigate(`/hospitais/${hospital.id}`)}
+                                      onEdit={() => handleEdit(hospital)}
+                                      onDelete={() => handleDelete(hospital.id)}
+                                    />
+                                  ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-4 text-sm text-muted-foreground bg-muted/30 rounded-lg">
+                                Nenhum hospital nesta região
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+
+            {/* Hospitais sem hierarquia */}
+            {hospitaisSemHierarquia.length > 0 && (
+              <Card className="hospital-card border-l-4 border-l-gray-400">
+                <CardHeader>
+                  <CardTitle className="flex items-center space-x-3">
+                    <Building className="h-6 w-6 text-gray-600" />
+                    <span className="text-xl">Hospitais Independentes</span>
+                    <Badge variant="outline" className="bg-gray-100 text-gray-700">
+                      Sem Hierarquia
+                    </Badge>
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Hospitais que não estão vinculados a uma região específica
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {hospitaisSemHierarquia
+                      .filter((h) => 
+                        h.nome.toLowerCase().includes(searchTerm.toLowerCase())
+                      )
+                      .map((hospital) => (
+                        <HospitalCard
+                          key={hospital.id}
+                          hospital={hospital}
+                          onView={() => navigate(`/hospitais/${hospital.id}`)}
+                          onEdit={() => handleEdit(hospital)}
+                          onDelete={() => handleDelete(hospital.id)}
+                        />
+                      ))}
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            )}
+
+            {/* Estado vazio */}
+            {hospitais.length === 0 && (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Building2 className="h-16 w-16 text-muted-foreground mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Nenhum hospital cadastrado</h3>
+                  <p className="text-muted-foreground text-center mb-6">
+                    Comece criando seu primeiro hospital na rede
+                  </p>
+                  <Button onClick={() => setViewMode("create")} className="hospital-button-primary">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Primeiro Hospital
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
+        ) : (
+          /* Visualização em grade */
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {hospitaisFiltrados.map((hospital) => (
+                <HospitalCard
+                  key={hospital.id}
+                  hospital={hospital}
+                  onView={() => navigate(`/hospitais/${hospital.id}`)}
+                  onEdit={() => handleEdit(hospital)}
+                  onDelete={() => handleDelete(hospital.id)}
+                  showHierarchy
+                />
+              ))}
+            </div>
 
-          {/* Mensagem quando não há hospitais */}
-          {hospitaisFiltrados.length === 0 && (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  {hospitais.length === 0
-                    ? "Nenhum hospital cadastrado"
-                    : "Nenhum hospital encontrado"}
-                </h3>
-                <p className="text-muted-foreground text-center mb-4">
-                  {hospitais.length === 0
-                    ? "Comece criando seu primeiro hospital"
-                    : "Ajuste os filtros ou crie um novo hospital"}
-                </p>
-                <div className="flex space-x-2">
-                  {hospitais.length === 0 ? (
-                    <Button onClick={handleOpenCreateModal}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Criar Primeiro Hospital
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setSelectedRede("all");
-                          setSelectedGrupo("all");
-                          setSelectedRegiao("all");
-                        }}
-                      >
-                        Limpar Filtros
-                      </Button>
-                      <Button onClick={handleOpenCreateModal}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Novo Hospital
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
-        {/* Resumo estatístico quando há filtros ativos */}
-        {(selectedRede !== "all" || selectedGrupo !== "all" || selectedRegiao !== "all") && 
-         hospitaisFiltrados.length > 0 && (
-          <Card className="hospital-card border-l-4 border-l-secondary">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2 text-lg">
-                <BarChart3 className="h-5 w-5 text-secondary" />
-                <span>Resumo da Seleção</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div className="p-3 bg-primary/5 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">
-                    {hospitaisFiltrados.length}
+            {hospitaisFiltrados.length === 0 && searchTerm && (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Search className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Nenhum hospital encontrado</h3>
+                  <p className="text-muted-foreground text-center mb-4">
+                    Tente ajustar os filtros de busca
                   </p>
-                  <p className="text-xs text-muted-foreground">Hospitais</p>
-                </div>
-                <div className="p-3 bg-secondary/5 rounded-lg">
-                  <p className="text-2xl font-bold text-secondary">
-                    {selectedRede !== "all" ? "1" : redes.length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedRede !== "all" ? "Rede" : "Redes"}
-                  </p>
-                </div>
-                <div className="p-3 bg-primary/5 rounded-lg">
-                  <p className="text-2xl font-bold text-primary">
-                    {selectedGrupo !== "all" ? "1" : getGruposFiltrados().length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedGrupo !== "all" ? "Grupo" : "Grupos"}
-                  </p>
-                </div>
-                <div className="p-3 bg-secondary/5 rounded-lg">
-                  <p className="text-2xl font-bold text-secondary">
-                    {selectedRegiao !== "all" ? "1" : getRegioesFiltradas().length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {selectedRegiao !== "all" ? "Região" : "Regiões"}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Filtros ativos:
-                  </span>
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => {
-                      setSelectedRede("all");
-                      setSelectedGrupo("all");
-                      setSelectedRegiao("all");
+                      setSearchTerm("");
+                      setSelectedRede("todas");
+                      setSelectedGrupo("todos");
+                      setSelectedRegiao("todas");
                     }}
-                    className="text-xs"
                   >
                     Limpar Filtros
                   </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+// Componente de card do hospital otimizado
+interface HospitalCardProps {
+  hospital: Hospital;
+  onView: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+  showHierarchy?: boolean;
+}
+
+function HospitalCard({ hospital, onView, onEdit, onDelete, showHierarchy = false }: HospitalCardProps) {
+  return (
+    <Card className="hospital-card-enhanced group cursor-pointer" onClick={onView}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <CardTitle className="text-lg group-hover:text-primary transition-colors flex items-center space-x-2">
+              <Building2 className="h-5 w-5" />
+              <span>{hospital.nome}</span>
+            </CardTitle>
+            
+            {/* Hierarquia organizacional */}
+            {showHierarchy && hospital.regiao && (
+              <div className="mt-2 space-y-1">
+                {hospital.regiao.grupo?.rede && (
+                  <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                    {hospital.regiao.grupo.rede.nome}
+                  </Badge>
+                )}
+                {hospital.regiao.grupo && (
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 ml-1">
+                    {hospital.regiao.grupo.nome}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200 ml-1">
+                  {hospital.regiao.nome}
+                </Badge>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className="h-8 w-8 p-0"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-3">
+        {/* Informações básicas */}
+        <div className="space-y-2 text-sm">
+          {hospital.endereco && (
+            <div className="flex items-start space-x-2">
+              <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <span className="text-muted-foreground line-clamp-2">{hospital.endereco}</span>
+            </div>
+          )}
+          {hospital.telefone && (
+            <div className="flex items-center space-x-2">
+              <Phone className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">{hospital.telefone}</span>
+            </div>
+          )}
+          {hospital.cnpj && (
+            <div className="flex items-center space-x-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground font-mono text-xs">{hospital.cnpj}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Baseline de custos */}
+        {hospital.baseline && (
+          <div className="bg-muted/30 rounded-lg p-3 border">
+            <div className="text-xs font-medium text-muted-foreground mb-2">Baseline</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-muted-foreground">Funcionários:</span>
+                <span className="font-medium ml-1">{hospital.baseline.quantidade_funcionarios || 0}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Custo:</span>
+                <span className="font-medium ml-1">R$ {hospital.baseline.custo_total || "0,00"}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Método SCP */}
+        {hospital.scpMetodo && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">Método SCP:</span>
+            <Badge variant="outline" className="text-xs">
+              {hospital.scpMetodo.key}
+            </Badge>
+          </div>
+        )}
+
+        {/* Ações rápidas */}
+        <div className="flex items-center justify-between pt-2 border-t">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView();
+            }}
+            className="flex-1 mr-1"
+          >
+            <Eye className="h-4 w-4 mr-1" />
+            Ver Detalhes
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation();
+              // Navegar diretamente para unidades do hospital
+              window.location.href = `/#/unidades?hospitalId=${hospital.id}`;
+            }}
+            className="flex-1 ml-1"
+          >
+            <Layers3 className="h-4 w-4 mr-1" />
+            Unidades
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
